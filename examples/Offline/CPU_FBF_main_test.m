@@ -10,7 +10,7 @@ direc='./dataset/';
 savedir=[direc,'result/'];mkdir(savedir);
 file = dir([direc, '*.mat']);
 
-for fileIndex=5%1%1:length(file)
+for fileIndex=1%1%1:length(file)
 %     close all 
     location=[direc file(fileIndex).name];   
     load(location,'UserSet','Trans');

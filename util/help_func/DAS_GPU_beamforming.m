@@ -170,22 +170,10 @@ Receive = repmat(struct('framenum', 1, ...
     'startSample',1, ...
     'endSample',ImagParam.numSample),ImagParam.numFiringPerFrame*ImagParam.numAcq*ImagParam.numFrame,1);
 
-if (ImagParam.numAcq==1)
-    if ImagParam.numFiringPerFrame==1
+if (ImagParam.numAcq==1 && ImagParam.numSample==sizeRcvData(1))
         for i = 1:ImagParam.numFrame*ImagParam.numFiringPerFrame % 3 acquisitions per frame
             Receive(i).framenum = i;
         end
-    else
-        for i = 1:ImagParam.numFrame % 3 acquisitions per frame
-            k = ImagParam.numFiringPerFrame*(i-1)*ImagParam.numAcq;
-            for j = 1:ImagParam.numFiringPerFrame*ImagParam.numAcq
-                Receive(k+j).framenum = i;
-                Receive(k+j).acqNum = j;
-                Receive(k+j).startSample=(j-1)*ImagParam.numSample+1;
-                Receive(k+j).endSample=j*ImagParam.numSample;
-            end
-        end
-    end
 else
     for i = 1:ImagParam.numFrame % 3 acquisitions per frame
         k = ImagParam.numFiringPerFrame*(i-1)*ImagParam.numAcq;
