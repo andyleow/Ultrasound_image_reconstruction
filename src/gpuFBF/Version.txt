@@ -1,0 +1,10 @@
+cuFBF - CUDA Fourier Beamforming 
+
+v1.0 (2019/08/14)
+- Support plane wave imaging reconstruction
+- maximum pixelSize = [half sampling wavelength, pitch]
+- Include FOV extension but not arbitrary pixel size
+- Reduce overhead associate to memory initialization and memory release
+- Include memory initialization and release function 
+- include gpu-selection if multiple gpus exist
+- Include FOV extension
