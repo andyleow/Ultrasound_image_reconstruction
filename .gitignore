@@ -1,2 +1,4 @@
 #Igonoring path 
 /dataset
+*.cu
+*.cuh
