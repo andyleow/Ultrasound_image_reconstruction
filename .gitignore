@@ -1,4 +1,4 @@
 #Igonoring path 
 /dataset
-src/**/*.cu
-src/**/*.cuh
+/src/**/*.cu
+/src/**/*.cuh
