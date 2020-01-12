@@ -7,13 +7,15 @@ function [UserSet,Trans,ImagParam] = genParams(varargin)
 %           in probe parameter
 %       ii)  numFrame/NumFrame:; number of DMA transfer frame
 %       iii) numAcq: number of acquiring frames per DMA transfer frame
-%       iv) na: number of angle
-%       v) angleRange: transmit angle Range
-%       vi) numChannel (Optional): number of receive channel
-%       vii) numSample (Optional): number of receive sample per firing
-%       viii) sampleDepthMM: receive sample in (mm). Used to calculate
+%       iv) na: number of angle in x direction
+%       v) na2: number of angle in y direction (only exist in 3D imaging)
+%       vi) angleRange: transmit angle Range in x direction
+%       vii) angleRange2: transmit angle Range in y direction (only exist in 3D imaging)
+%       viii) numChannel (Optional): number of receive channel
+%       ix) numSample (Optional): number of receive sample per firing
+%       x) sampleDepthMM: receive sample in (mm). Used to calculate
 %           numSample if numSample is not specified
-%       ix) txFreq/TXFreq: transmit frequency
+%       xi) txFreq/TXFreq: transmit frequency
 %  b) Probe : transducer name,  if not exist in UserSet
 %  c) Recon (Optional): Struct contain recon information
 %       i) startFrame: first frame of the imaging sequence
@@ -32,17 +34,18 @@ function [UserSet,Trans,ImagParam] = genParams(varargin)
 %        iii) endFrame: last frame of the imaging sequence
 %       iv) numFiringPerFrame:  Number of transmission used to form one high resolution Image
 %        v) skipFrame: Number of high resolution images to skip
-%        vi) deg_tx: A vector containing the transmit steering angle
-%        vii) sumPulse: Pulse summing 0:Bmode, 1:PI all-no summing 2: PI sum-sum2pulse
-%        viii) returnType: 'HRI' or 'LRI' reconstruction
-%        ix) fs: sampling frequency
-%         x) c: speed of sound
-%         xi) gain: digital gain
-%        xii) delay: delay that account for transmit delay, receive delay and lens correction [s]
-%       xiii) numSample: number of receive sample point per firing
-%       xiv) numChannel: number of receive channel
-%       xv) numAcq: number of acquiring frames per DMA transfer frame
-%       xvi) numFrame: number of DMA transfer frame
+%        vi) degX_tx: A vector contain the transmit steering angle in x direction
+%        vii) degY_tx: A vector contain the transmit steering angle in y direction
+%        viii) sumPulse: Pulse summing 0:Bmode, 1:PI all-no summing 2: PI sum-sum2pulse
+%        ix) returnType: 'HRI' or 'LRI' reconstruction
+%        x) fs: sampling frequency
+%        xi) c: speed of sound
+%        xii) gain: digital gain
+%        xiii) delay: delay that account for transmit delay, receive delay and lens correction [s]
+%       xiv) numSample: number of receive sample point per firing
+%       xv) numChannel: number of receive channel
+%       xvi) numAcq: number of acquiring frames per DMA transfer frame
+%       xvii) numFrame: number of DMA transfer frame
 
 %%    
 if nargin==1
@@ -61,7 +64,7 @@ end
 
 %Default value
 ImagParam = struct('probe',[],'startFrame',1,'endFrame',1,'numFiringPerFrame',1,'skipFrame',1,...
-    'deg_tx',0, 'sumPulse', 0,'returnType','HRI', 'fs',[],'c',1540,'gain',1,'delay',[], ...
+    'degX_tx',0,'degY_tx',0, 'sumPulse', 0,'returnType','HRI', 'fs',[],'c',1540,'gain',1,'delay',[], ...
     'numSample',[],'numChannel',128,'numAcq',1, 'numFrame',1);
 
 % Transducer parameter
@@ -132,8 +135,21 @@ end
 
 % Transmit angle
 if UserSet.na>1
-    for i=1:UserSet.na
-        ImagParam.deg_tx(i)=(-UserSet.angleRange/2+(i-1)*(UserSet.angleRange)/(UserSet.na-1))*pi/180;
+    if isfield(UserSet,'na2') && isfield(UserSet,'angleRange2')
+        if UserSet.na2>1
+            for i=1:UserSet.na
+                for j=1:UserSet.na2
+                    index =(i-1)*UserSet.na+j;
+                    ImagParam.degX_tx(index)=(-UserSet.angleRange/2+(i-1)*(UserSet.angleRange)/(UserSet.na-1))*pi/180;
+                    ImagParam.degY_tx(index)=(-UserSet.angleRange2/2+(j-1)*(UserSet.angleRange2)/(UserSet.na2-1))*pi/180;
+                end
+            end
+        end
+    else
+        for i=1:UserSet.na
+            ImagParam.degX_tx(i)=(-UserSet.angleRange/2+(i-1)*(UserSet.angleRange)/(UserSet.na-1))*pi/180;
+            ImagParam.degY_tx(i)=0;
+        end
     end
 end
 
@@ -161,7 +177,12 @@ end
 %Calculate the number of sample per firing is not specified
 if ~isfield(UserSet,'numSample')
     switch Trans.name(1)
-        case 'L'
+        case 'C' 
+            Intermediate.sampleDepthWL=ceil(UserSet.sampleDepthMM*1e-3*(Trans.frequency/1540));
+            Intermediate.maxAcqLength = sqrt(Intermediate.sampleDepthWL^2 + (ImagParam.numChannel*Trans.pitch*(Trans.frequency/ImagParam.c))^2);
+            Intermediate.wlsPer128 = ImagParam.numChannel/(UserSet.samplePerWave*2); % wavelengths in 128 samples for PI
+            Intermediate.numRcvSamples = 2*(Intermediate.wlsPer128*ceil(Intermediate.maxAcqLength/Intermediate.wlsPer128))*UserSet.samplePerWave;
+        case 'L' 
             Intermediate.sampleDepthWL=ceil(UserSet.sampleDepthMM*1e-3*(Trans.frequency/1540));
             Intermediate.maxAcqLength = sqrt(Intermediate.sampleDepthWL^2 + (ImagParam.numChannel*Trans.pitch*(Trans.frequency/ImagParam.c))^2);
             Intermediate.wlsPer128 = ImagParam.numChannel/(UserSet.samplePerWave*2); % wavelengths in 128 samples for PI

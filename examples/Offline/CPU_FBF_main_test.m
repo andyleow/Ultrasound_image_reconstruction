@@ -28,7 +28,7 @@ for fileIndex=1%1%1:length(file)
 %     Recon.sumPulse=0;       %Pulse summing 0:Bmode, 1:PI all-no summing 2: PI sum-sum2pulse
     Recon.type  = 'HRI';		% HRI, LRI, or CRI
     [UserSet,Trans,ImagParam] = genParams(UserSet,Trans,Recon);
-    ImagParam.delay = -abs(Trans.position(1)*sin(ImagParam.deg_tx))/ImagParam.c;
+    ImagParam.delay = -abs(Trans.position(1)*sin(ImagParam.degX_tx))/ImagParam.c;
     ImagParam.senseCutoff = 0;
     
     %%  Define filter parameters

@@ -21,15 +21,20 @@ for fileIndex=1%1:length(file)
     vid1.Quality = 50;
 
     %% Define recon parameter
-%     Recon.startFrame = 1;
-%     Recon.endFrame = 2;%%UserSet.numAcq*UserSet.NumFrame;
+    Recon.startFrame = 1;
+    Recon.endFrame = 2;%%UserSet.numAcq*UserSet.NumFrame;
 %     Recon.NumFiringPerFrame = UserSet.na;
 %     Recon.skipFrame = 1; % 1 = no skip, 2 = skip 1 frame, etc
 %     Recon.sumPulse=0;       %Pulse summing 0:Bmode, 1:PI all-no summing 2: PI sum-sum2pulse
-    Recon.type  = 'HRI';		% HRI, LRI, or CRI
+%     Trans.name=UserSet.transducer;
+    Recon.type  = 'LRI';		% HRI, LRI, or CRI
     [UserSet,Trans,ImagParam] = genParams(UserSet,Trans,Recon);
-    ImagParam.delay = -abs(Trans.position(1)*sin(ImagParam.deg_tx))/ImagParam.c;
-    ImagParam.senseCutoff = 0;
+    if strcmp(Trans.name,'LPICMUS')
+        ImagParam.delay = -abs(Trans.position(1)*sin(ImagParam.degX_tx))/ImagParam.c;
+    else
+        ImagParam.delay= 2*Trans.lensCorrection/ImagParam.c*ones(UserSet.na,1);
+    end
+    ImagParam.senseCutoff = 0.5;
     
     %%  Define filter parameters
     FiltParam.type='FIRBand';    %all,FIRHigh,FIRLow,FIRBand
@@ -42,25 +47,36 @@ for fileIndex=1%1:length(file)
         case 'L'
             pixelMap.focus=0;
             pixelMap.dz=min(ImagParam.c/ImagParam.fs/2, 50e-5);
+            pixelMap.dy=0;
             pixelMap.dx=Trans.pitch;
-            pixelMap.upperLeft = [Trans.position(Trans.startAperture,1)*1 5/1000];
-%             pixelMap.bottomRight = [Trans.position(Trans.startAperture+127,1)*1+pixelMap.dx/2 UserSet.sampleDepthMM/1000];
-            pixelMap.bottomRight = [Trans.position(Trans.startAperture+127,1)*1 50/1000];
-
+            pixelMap.upperLeft = [Trans.position(Trans.startAperture,1)*1,0, 5/1000];
+            %             pixelMap.bottomRight = [Trans.position(Trans.startAperture+127,1)*1+pixelMap.dx/2 UserSet.sampleDepthMM/1000];
+            pixelMap.bottomRight = [Trans.position(Trans.startAperture+127,1)*1,0, 50/1000];
+        case 'C'  %Curvilinear
+            aperture = Trans.numElement*Trans.pitch; % aperture based on X elements
+            pixelMap.focus = -Trans.radius;
+            pixelMap.dz=1540/(Trans.frequency*4*2);
+            pixelMap.dy=0;
+            pixelMap.dx=Trans.pitch;
+            pixelMap.upperLeft = [-(UserSet.sampleDepthMM +Trans.radius)*sin(Trans.scanangle/2)*2, 0, 0*1e3]/1000;
+            pixelMap.bottomRight = [(UserSet.sampleDepthMM +Trans.radius)*sin(Trans.scanangle/2)*2, 0, UserSet.sampleDepthMM+2]/1000;
         case 'P'
-            aperture = Trans.numElement*(Trans.pitch+Trans.width); % aperture based on X elements
+            aperture = Trans.numElement*(Trans.pitch); % aperture based on X elements
             pixelMap.focus = -(aperture/2)/tan(-UserSet.scanRangle);
             pixelMap.dz=1540/(Trans.frequency*4*2);
+            pixelMap.dy=0;
             pixelMap.dx=Trans.pitch;
-            pixelMap.upperLeft = [-UserSet.sampleDepthMM 0*1e3]/1000;
-            pixelMap.bottomRight = [UserSet.sampleDepthMM UserSet.sampleDepthMM]/1000;
+            pixelMap.upperLeft = [-UserSet.sampleDepthMM, 0, 0*1e3]/1000;
+            pixelMap.bottomRight = [UserSet.sampleDepthMM, 0, UserSet.sampleDepthMM]/1000;
     end
+    
     %% GPU Beamforming
     tic;
     data = DAS_CPU_beamforming(location, Trans,ImagParam, FiltParam,pixelMap,'on');
     toc
 %     return
   %% Display and save Images
+    clear F
     open(vid1);
     figure
     z=(0:size(data,1)-1)*pixelMap.dz*1e3+pixelMap.upperLeft(2)*1e3;
@@ -75,7 +91,7 @@ for fileIndex=1%1:length(file)
     normMax=mean(max(max(abs(data1(:)))));
     
     for i=1:size(data1,3)
-        imagesc(x,z,20*log10(abs(data1(:,:,i))/normMax),[-60,0]);
+        imagesc(x,z,20*log10(abs(data1(:,:,i))/normMax),[-50,0]);
         %         imagesc(x,z,20*log10(abs(sum(data(:,:,:,i),3)/normMax)),[-30,0]);
         title(['Frame=',num2str(i)]);
         xlabel('mm');

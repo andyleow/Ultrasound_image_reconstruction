@@ -222,7 +222,7 @@ for i = 1:totalFrame
             Channels,Receive((RcvIndex-1)*ImagParam.numFiringPerFrame+j).framenum);
     end
     
-    image1=FBF_CPU_Func(rf_data,ImagParam.deg_tx, actAperture,FiltParam.coef, pixelMapX,...
+    image1=FBF_CPU_Func(rf_data,ImagParam.degX_tx, actAperture,FiltParam.coef, pixelMapX,...
             pixelMapZ,ImagParam.delay,ImagParam.fs, Trans.frequency,ImagParam.c, pixelMap.focus,ReconMode);
     
         
