@@ -16,18 +16,19 @@ function[ImgData]= DAS_GPU_beamforming(location, Trans,ImagParam, FiltParam, pix
 %        iii) endFrame: last frame of the imaging sequence
 %       iv) numFiringPerFrame:  Number of transmission used to form one high resolution Image
 %        v) skipFrame: Number of high resolution images to skip
-%        vi) deg_tx: A vector containing the transmit steering angle
-%        vii) sumPulse: Pulse summing 0:Bmode, 1:PI all-no summing 2: PI sum-sum2pulse
-%        viii) returnType: 'HRI' or 'LRI' reconstruction
-%        ix) fs: sampling frequency
-%         x) c: speed of sound
-%         xi) gain: digital gain
-%        xii) delay: delay that account for transmit delay, receive delay and lens correction [s]
-%       xiii) numSample: number of receive sample point per firing
-%       xiv) numChannel: number of receive channel
-%       xv) numAcq: number of acquiring frames per DMA transfer frame
-%       xvi) numFrame: number of DMA transfer frame
-%       xvii) senseCutoff: element sensitivity cutoff (0-1);
+%        vi) degX_tx: A vector contain the transmit steering angle in x direction
+%        vii) degY_tx: A vector contain the transmit steering angle in y direction
+%        viii) sumPulse: Pulse summing 0:Bmode, 1:PI all-no summing 2: PI sum-sum2pulse
+%        ix) returnType: 'HRI' or 'LRI' reconstruction
+%        x) fs: sampling frequency
+%        xi) c: speed of sound
+%        xii) gain: digital gain
+%        xiii) delay: delay that account for transmit delay, receive delay and lens correction [s]
+%       xiv) numSample: number of receive sample point per firing
+%       xv) numChannel: number of receive channel
+%       xvi) numAcq: number of acquiring frames per DMA transfer frame
+%       xvii) numFrame: number of DMA transfer frame
+%       xviii) senseCutoff: element sensitivity cutoff (0-1);
 %   d) FiltParam: Struct data 
 %       i) type:  'all','FIRHigh','FIRLow','FIRBand'
 %       ii) Fpass1: 1st cutoff frequency
@@ -35,32 +36,51 @@ function[ImgData]= DAS_GPU_beamforming(location, Trans,ImagParam, FiltParam, pix
 %        iv) tempMedFilt: Temporal medium filter, 0=off; 1=on
 %   e)pixelMap: Struct data 
 %       i) pixelMapX:  lateral position
+%       ii) pixelMapY:  elevation position
 %       ii) pixelMapZ: axial position
 %   f)tempMedFilt: 0 or 1 to enable temporal median filter 
 % 2) Output: LRI, HRI or CRI images
 
-%Specification for the GPU function: 
-%  Eg : reconImg = cuDAS_mainV1(initMode,rf_data, deg_tx, actAperture,FiltCoef, 
-% pixelMapX, t0, pixelMapZ,fs,ftx,c,focus,ReconMode,gpuID);
+%Specification for the GPU function:
+% 
+% Preallocate GPU resources and initialise imaging parameters
+% if (rf_data is in integer format)
+%  Eg : reconImg =  cuDAS_int(initMode,rf_data,degX_tx,degY_tx,actApertureX,...
+%               actApertureY,actApertureZ,FilterCoef, pixelMapX,pixelMapY,...
+%               pixelMapZ,delay,fs, ftx,c,focus,senseCutoff,ReconMode,gpuID);
+% (rf_data is in single precision format) 
+% reconImg =  cuDAS_single(initMode,rf_data,degX_tx,degY_tx,actApertureX,...
+%               actApertureY,actApertureZ,FilterCoef, pixelMapX,pixelMapY,...
+%               pixelMapZ,delay,fs, ftx,c,focus,senseCutoff,ReconMode,gpuID);
+
+% Execute reconstruction without the need for parameters
+% Eg :  reconImg=cuDAS_int(initMode,rf_data);
+%
+% Terminate GPU recon and free all GPU resource
+% Eg :  cuDAS_int(initMode);
 
 % Input: 
 %   1)initMode: 0:Execute and/or initialie memory; 1:(Re-)initialise memory, 2:clear memory
-%   2)rf_data: Input rf, multiPW(sample, channel,angle,frame)/singlePW(sample, channel, frame)
-%   3) deg_tx : A vector containing the transmit steering angle (in radian)
-%   4) actAperture:A vector containing the aperture position
-%   5) FilterCoef: A vector containing FIR filter coefficient
-%   6) pixelMapX: A vector containing the lateral image position
-%   7) pixelMapZ:A vector containing the axial image position
-%   8) delay: delay that account for transmit delay, receive delay and lens correction [s]
-%   9) fs: sampling frequency
-%   10) ftx: transmit frequency (for apodization function calculation)
-%   11) c: speed of sound
-%   12) focus: transmit focal point: 0 for plane wave, -ve for diverging wave 
-%   13) ReconMode: 0 for LRI and 1 for HRI
-%   14) gpuID: gpu device number (if multiple exist)
+%   2)rf_data: Input rf, (sample, channel,frame)/ (sample,channel,angle,frame)
+%   3) degX_tx : A vector containing the transmit steering angle in x direction (in radian)
+%   4) degY_tx : A vector containing the transmit steering angle in y direction (in radian)
+%   5) actApertureX:vector containing the aperture position in x direction(m)
+%   6) actApertureY:vector containing the aperture position in y direction(m)
+%   7) actApertureZ:A vector containing the aperture position in z direction(m)
+%   8) FilterCoef: A vector containing FIR filter coefficient 
+%   9) pixelMapX: A vector containing the lateral image position (m)
+%   10)pixelMapY: A vector containing the elevation image position (m)
+%   11) pixelMapZ:A vector containing the axial image position (m)
+%   12) delay: delay that account for transmit delay, receive delay and lens correction [s]
+%   13) fs: sampling frequency
+%   14) ftx: transmit frequency (for apodization function calculation)
+%   15) c: speed of sound
+%   16) focus: transmit focal point: 0 for plane wave, -ve for diverging wave 
+%   17) senseCutoff: sensitivity cutoff (0-1)
+%   17) ReconMode: 0 - LRI, 1 - HRI, 2 - Channel 
+%   18) gpuID: gpu device number (if multiple exist)
 % Output:
-% reconImg: Reconstructed image
-%
+% reconImg: Reconstructed image (only if initMode=0) 
 
 %%
 % Define filtering coeff based on pre-filtering option
@@ -76,6 +96,10 @@ if iscell(RcvData)
     sizeRcvData = size(RcvData{1});
 else
     sizeRcvData=size(RcvData);
+end
+
+if length(sizeRcvData)<3
+    sizeRcvData(3)=1;
 end
 
 try
@@ -122,7 +146,7 @@ end
 
 if ImagParam.sumPulse>0
     n=ImagParam.numSample;
-    k1=ImagParam.NumFiringPerFrame*ImagParam.numAcq;
+    k1=ImagParam.numFiringPerFrame*ImagParam.numAcq;
     switch ImagParam.sumPulse
         case 1
             disp('PI Pulses');
@@ -188,22 +212,27 @@ end
 %% Define Aperture Index and position
 numChannel=sizeRcvData(2);
 Channels=1:numChannel;
-ChannelFinal=Channels;
+
 if numChannel<Trans.numElement
-    actAperture=Trans.position(Channels+Trans.startAperture-1);
-    Channels=circshift(Channels,[0,-Trans.startAperture+1]);
+    actApertureX=Trans.position(Channels+Trans.startAperture-1,1);
+    Trans.connector = Trans.connector(Channels+Trans.startAperture-1);
+%     Channels=circshift(Channels,[0,-Trans.startAperture+1]);
 else
-     actAperture=Trans.position(:,1)';
-     if isfield(Trans,'connector')
-        [Channels,ChannelFinal] = sort(Trans.connector);
-        numChannel=Trans.numElement;    
-     end
+     actApertureX=Trans.position(:,1);
+     numChannel=Trans.numElement;    
 end
+
+actApertureY=Trans.position(:,2);
+actApertureZ=Trans.position(:,3);
 
 %%
 % Generate pixel map of the imaging view
 pixelMapX = pixelMap.upperLeft(1):pixelMap.dx:pixelMap.bottomRight(1);
-pixelMapZ = (pixelMap.upperLeft(2):pixelMap.dz:pixelMap.bottomRight(2))';
+pixelMapY = pixelMap.upperLeft(2):pixelMap.dy:pixelMap.bottomRight(2);
+if isempty(pixelMapY)
+    pixelMapY=0;
+end
+pixelMapZ = (pixelMap.upperLeft(3):pixelMap.dz:pixelMap.bottomRight(3))';
 imageSize = [length(pixelMapZ),length(pixelMapX)] ;			% 5mm = 33pixel pixel.z
 
  if ~isfield(pixelMap,'focus')
@@ -223,7 +252,6 @@ switch (ImagParam.returnType)
         ReconMode=0;
         ImgData = zeros(imageSize(1),imageSize(2),floor(totalFrame/ImagParam.skipFrame),'single');
 end
-
 
 % Turn on progress bar
 if (strcmp(progress,'on'))
@@ -245,17 +273,17 @@ for i = 1:totalFrame
     
     %   % Update here to fit your own file name
     for j=1:ImagParam.numFiringPerFrame
-        rf_data(:,ChannelFinal,j)=RcvData(Receive((RcvIndex-1)*ImagParam.numFiringPerFrame+j).startSample:Receive((RcvIndex-1)*ImagParam.numFiringPerFrame+j).endSample,...
-            Channels,Receive((RcvIndex-1)*ImagParam.numFiringPerFrame+j).framenum);
+        rf_data(:,:,j)=RcvData(Receive((RcvIndex-1)*ImagParam.numFiringPerFrame+j).startSample:Receive((RcvIndex-1)*ImagParam.numFiringPerFrame+j).endSample,...
+            Trans.connector,Receive((RcvIndex-1)*ImagParam.numFiringPerFrame+j).framenum);
     end
     
     if (i==1)
         if isinteger(rf_data)
-            cuDAS_int(1,rf_data,ImagParam.deg_tx, actAperture,FiltParam.coef, pixelMapX,...
-                pixelMapZ,ImagParam.delay,ImagParam.fs, Trans.frequency,ImagParam.c, pixelMap.focus,ImagParam.senseCutoff,ReconMode,0);
+            cuDAS_int(1,rf_data,ImagParam.degX_tx,ImagParam.degY_tx, actApertureX,actApertureY,actApertureZ,FiltParam.coef, pixelMapX,...
+                pixelMapY,pixelMapZ,ImagParam.delay,ImagParam.fs, Trans.frequency,ImagParam.c, pixelMap.focus,ImagParam.senseCutoff,ReconMode,0);
         else
-            cuDAS_single(1,rf_data,ImagParam.deg_tx, actAperture,FiltParam.coef, pixelMapX,...
-                pixelMapZ,ImagParam.delay,double(ImagParam.fs), Trans.frequency,ImagParam.c, pixelMap.focus,ImagParam.senseCutoff,ReconMode,0);
+           cuDAS_single(1,rf_data,ImagParam.degX_tx,ImagParam.degY_tx, actApertureX,actApertureY,actApertureZ,FiltParam.coef, pixelMapX,...
+                pixelMapY,pixelMapZ,ImagParam.delay,ImagParam.fs, Trans.frequency,ImagParam.c, pixelMap.focus,ImagParam.senseCutoff,ReconMode,0);
         end
     end
     

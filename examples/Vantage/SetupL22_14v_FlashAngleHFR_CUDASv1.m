@@ -9,9 +9,9 @@ activate;
 
 %Serialisation and savefast function path
 % addpath(genpath('C:\Users\chl912\Documents\Matlab_ExFun\02 Matlab Savefast\savefast'));
-% addpath(genpath('C:\Users\chl912\Documents\VerasonicsSoftware\CustomScript\prototype\L22-14v\gpu_prototype\cuda'));
+% addpath(genpath('/home/chleow/git-repo/Ultrasound_image_reconstruction/examples'));
 addpath(genpath('/home/chleow/Matlab/externFunc'));
-addpath(genpath('/home/chleow/Matlab/Vantage-4.0.1-1903121200/myFunc/cuda'));
+addpath(genpath('/home/chleow/git-repo/Ultrasound_image_reconstruction/'));
 
 %%
 close all;
@@ -544,8 +544,10 @@ return
 %EF#1
 GPU_init()
 % keyboard
-GPUParams=struct('rf_data',[],'deg_tx',[], 'actAperture',[],'filterCoef',[],...
-    'pixelMapX',[], 'pixelMapZ',[],'fs',[],'c',[],'delay',[],'txFocus',[],...
+GPUParams=struct('rf_data',[],'degX_tx',[],'degY_tx',[],...
+    'actApertureX',[],'actApertureY',[],'actApertureZ',[],'filterCoef',[],...
+    'pixelMapX',[],'pixelMapY',[], 'pixelMapZ',[],...
+    'fs',[],'c',[],'delay',[],'txFocus',[],...
     'senseCutoff',0,'reconMode',0,'gpuID',0,'channelInd',[]);
 
 %Initialise GPUParams
@@ -574,23 +576,28 @@ GPUParams.reconSkipFrame =UserSet.ReconSkipFrame;
 GPUParams.reconFrames= 1:GPUParams.reconSkipFrame:GPUParams.numAcq;
 GPUParams.rf_data=zeros(GPUParams.numSample,GPUParams.numChannel,GPUParams.na,GPUParams.numFrame,'int16');
 
-GPUParams.deg_tx(1)=0;
+GPUParams.degX_tx(1)=0;
 if UserSet.na>1
     for i=1:UserSet.na
-        GPUParams.deg_tx(i)=(-UserSet.AngleRange/2+(i-1)*(UserSet.AngleRange)/(UserSet.na-1))*pi/180;
+        GPUParams.degX_tx(i)=(-UserSet.AngleRange/2+(i-1)*(UserSet.AngleRange)/(UserSet.na-1))*pi/180;
+        GPUParams.degY_tx(i)=0;
     end
 end
 
-GPUParams.actAperture=Trans.ElementPos(:,1)*1e-3;
+GPUParams.actApertureX=Trans.ElementPos(:,1)*1e-3;
+GPUParams.actApertureY=Trans.ElementPos(:,2)*1e-3;
+GPUParams.actApertureZ=Trans.ElementPos(:,3)*1e-3;
+
 GPUParams.filterCoef= fir1(51,Trans.Bandwidth/(Trans.frequency*2));
 
 GPUParams.fs=Trans.frequency*1e6*4;
 GPUParams.ftx =UserSet.TXFreq*1e6;
 GPUParams.c = Resource.Parameters.speedOfSound;
 GPUParams.txFocus =UserSet.TXFocusMM*1e-3;
-GPUParams.SenseCutoff = Preset.SenseCut
+GPUParams.SenseCutoff = Preset.SenseCut;
 
 GPUParams.pixelMapX = linspace(min(Trans.ElementPos(:)),max(Trans.ElementPos(:)),PData.Size(2))*1e-3;
+GPUParams.pixelMapY=0;
 wavelength=GPUParams.c/Trans.frequency*1e-6;
 range = evalin('base','UIParam.Range');
 GPUParams.pixelMapZ = linspace(0,range*wavelength,PData.Size(1));
@@ -601,9 +608,11 @@ GPUParams.IQData= zeros(PData.Size(1),PData.Size(2),UserSet.numAcq,'single');
 GPUParams.IQData= complex(GPUParams.IQData,0);
 GPUParams.SVDEn = UserSet.SVDEn; 
 
-cuDAS_int(1,GPUParams.rf_data,GPUParams.deg_tx, GPUParams.actAperture,GPUParams.filterCoef, GPUParams.pixelMapX,...
-            GPUParams.pixelMapZ,GPUParams.delay,GPUParams.fs, GPUParams.ftx,GPUParams.c, GPUParams.txFocus,...
-            GPUParams.SenseCutoff,GPUParams.reconMode,GPUParams.gpuID);
+cuDAS_int(1,GPUParams.rf_data,GPUParams.degX_tx,GPUParams.degY_tx, ...
+    GPUParams.actApertureX,GPUParams.actApertureY,GPUParams.actApertureZ,...
+    GPUParams.filterCoef, GPUParams.pixelMapX,GPUParams.pixelMapX,GPUParams.pixelMapZ,...
+    GPUParams.delay,GPUParams.fs, GPUParams.ftx,GPUParams.c, GPUParams.txFocus,...
+    GPUParams.SenseCutoff,GPUParams.reconMode,GPUParams.gpuID);
         
 assignin('base','GPUParams',GPUParams);
 return

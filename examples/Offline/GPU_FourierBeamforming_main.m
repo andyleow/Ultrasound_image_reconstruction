@@ -10,7 +10,7 @@ direc='./dataset/'
 savedir=[direc,'result/'];mkdir(savedir);
 file = dir([direc, '*.mat']);
 
-for fileIndex=5%1%1:length(file)
+for fileIndex=1%1%1:length(file)
     %     close all
     location=[direc file(fileIndex).name];
     load(location,'UserSet','Trans');
@@ -32,7 +32,7 @@ for fileIndex=5%1%1:length(file)
 %     Recon.sumPulse=0;       %Pulse summing 0:Bmode, 1:PI all-no summing 2: PI sum-sum2pulse
     Recon.type  = 'HRI';		% HRI, LRI, or CRI
     [UserSet,Trans,ImagParam] = genParams(UserSet,Trans,Recon);
-    ImagParam.delay = -abs(Trans.position(1)*sin(ImagParam.deg_tx))/ImagParam.c;
+    ImagParam.delay = -abs(Trans.position(1)*sin(ImagParam.degX_tx))/ImagParam.c;
     
     %%  Define filter parameters
     FiltParam.type='FIRBand';    %all,FIRHigh,FIRLow,FIRBand

@@ -514,7 +514,7 @@ GPUParams.c = Resource.Parameters.speedOfSound;
 GPUParams.txFocus =UserSet.TXFocus;
 
 GPUParams.pixelMapX = linspace(min(Trans.ElementPos(:)),max(Trans.ElementPos(:)),PData.Size(2))*1e-3;
-keyboard
+% keyboard
 wavelength=GPUParams.c/Trans.frequency*1e-6/8;
 GPUParams.pixelMapZ = linspace(0,PData.Size(1)*wavelength,PData.Size(1));
 GPUParams.delay=(2*Trans.lensCorrection*1e-3/GPUParams.c)*ones(UserSet.na,1);

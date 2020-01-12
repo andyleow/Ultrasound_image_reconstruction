@@ -37,28 +37,42 @@ function[ImgData]= Fourier_GPU_beamforming(location, Trans,ImagParam, FiltParam,
 %       ii) pixelMapZ: axial position
 %   f)tempMedFilt: 0 or 1 to enable temporal median filter 
 % 2) Output: LRI, HRI or CRI images
+      
+%Specification for the GPU function:
+% 
+% Preallocate GPU resources and initialise imaging parameters
+% if (rf_data is in integer format)
+%  Eg : reconImg =  cuFBF_int(initMode,rf_data,degX_tx,actApertureX,...
+%               FilterCoef, pixelMapX,pixelMapZ,delay,fs,ftx,c,focus,ReconMode,gpuID);
+% (rf_data is in single precision format) 
+% reconImg = cuFBF_single(initMode,rf_data,degX_tx,actApertureX,...
+%               FilterCoef, pixelMapX,pixelMapZ,delay,fs,ftx,c,focus,ReconMode,gpuID);
 
-%Specification for the GPU function: 
-%  Eg : reconImg = cuDAS_mainV1(initMode,rf_data, deg_tx, actAperture,FiltCoef, 
-% pixelMapX, t0, pixelMapZ,fs,ftx,c,focus,ReconMode,gpuID);
+% Execute reconstruction without the need for parameters
+% Eg :  reconImg=cuFBF_int(initMode,rf_data);
+%
+% Terminate GPU recon and free all GPU resource
+% Eg :  cuFBF_int(initMode);
 
 % Input: 
 %   1)initMode: 0:Execute and/or initialie memory; 1:(Re-)initialise memory, 2:clear memory
-%   2)rf_data: Input rf, multiPW(sample, channel,angle,frame)/singlePW(sample, channel, frame)
-%   3) deg_tx : A vector containing the transmit steering angle (in radian)
-%   4) actAperture:A vector containing the aperture position
-%   5) FilterCoef: A vector containing FIR filter coefficient
-%   6) pixelMapX: A vector containing the lateral image position
-%   7) pixelMapZ:A vector containing the axial image position
-%   8) delay: delay that account for transmit delay, receive delay and lens correction [s]
-%   9) fs: sampling frequency
-%   10) ftx: transmit frequency (for apodization function calculation)
-%   11) c: speed of sound
-%   12) focus: transmit focal point: 0 for plane wave, -ve for diverging wave 
-%   13) ReconMode: 0 for LRI and 1 for HRI
-%   14) gpuID: gpu device number (if multiple exist)
+%   2)rf_data: Input rf, (sample, channel,frame)/ (sample,channel,angle,frame)
+%   3) degX_tx : A vector containing the transmit steering angle in x direction (in radian)
+%   4) actApertureX:vector containing the aperture position in x direction(m)
+%   5) actApertureZ:A vector containing the aperture position in z direction(m)
+%   6) FilterCoef: A vector containing FIR filter coefficient 
+%   7) pixelMapX: A vector containing the lateral image position (m)
+%   8) pixelMapZ:A vector containing the axial image position (m)
+%   9) delay: delay that account for transmit delay, receive delay and lens correction [s]
+%   10) fs: sampling frequency
+%   11) ftx: transmit frequency (for apodization function calculation)
+%   12) c: speed of sound
+%   13) focus: transmit focal point: 0 for plane wave, -ve for diverging wave 
+%   14) ReconMode: 0 - LRI, 1 - HRI, 2 - Channel 
+%   15) gpuID: gpu device number (if multiple exist)
 % Output:
-% reconImg: Reconstructed image
+% reconImg: Reconstructed image (only if initMode=0) 
+
 %
 
 %%
@@ -258,10 +272,10 @@ for i = 1:totalFrame
     
       if (i==1)
         if isinteger(rf_data)
-            cuFBF_int(1,rf_data,ImagParam.deg_tx, actAperture,FiltParam.coef, pixelMapX,...
+            cuFBF_int(1,rf_data,ImagParam.degX_tx, actAperture,FiltParam.coef, pixelMapX,...
                 pixelMapZ,ImagParam.delay,ImagParam.fs, Trans.frequency,ImagParam.c, pixelMap.focus,ReconMode,0);
         else
-            cuFBF_single(1,rf_data,ImagParam.deg_tx, actAperture,FiltParam.coef, pixelMapX,...
+            cuFBF_single(1,rf_data,ImagParam.degX_tx, actAperture,FiltParam.coef, pixelMapX,...
                 pixelMapZ,ImagParam.delay,double(ImagParam.fs), Trans.frequency,ImagParam.c, pixelMap.focus,ReconMode,0);
         end
     end
