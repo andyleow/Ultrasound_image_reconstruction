@@ -1,0 +1,18 @@
+Updates 2020.04.26
+-Fixed bugs on 3D imaging
+-Included examples script for 3d acq and reconsruction
+
+Updates 2020.04.18
+- Support 3D diverging wave imaging reconsturction
+- Corrected 3d delay calculation for compounding angle
+- Modify receive delay calculation to speed up calculation 
+
+Updates 2020/03/01
+- Support 2D and 3D plane wave reconstruction
+- Support 2D diverging wave reconstruction  
+- Support arbitrary pixelMap 
+- reduce overhead associate to memory initialization and memory release
+- Include memory initialization and release function 
+- Include gpu selection if multiple gpu exists
+- Includes element directivity based on transmit angel adn sensitivity cutoff
+
