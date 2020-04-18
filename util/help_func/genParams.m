@@ -160,8 +160,12 @@ end
 ImagParam.delay = (2*Trans.lensCorrection/ImagParam.c)*ones(ImagParam.numFiringPerFrame,1); %zeros(ImagParam.NumFiringPerFrame,1);
 
 %Receive channel
-if isfield(UserSet,'numChanel')
-    ImagParam.numChanel = UserSet.numChanel;
+if isfield(UserSet,'numChannel')
+    ImagParam.numChannel = UserSet.numChannel;
+else
+    if Trans.name(1)=='M'
+        ImagParam.numChannel = Trans.numElement;
+    end
 end
 
 % Automatic find the first channel if aperture greater than receive channel
@@ -191,6 +195,11 @@ if ~isfield(UserSet,'numSample')
             Intermediate.sampleDepthWL=ceil(UserSet.sampleDepthMM*1e-3*(Trans.frequency/1540));
             Intermediate.maxAcqLength = sqrt(Intermediate.sampleDepthWL^2 + (Trans.numElement*Trans.pitch*(Trans.frequency/ImagParam.c))^2+2* Intermediate.sampleDepthWL*cos( UserSet.scanRangle-pi/2));
             Intermediate.wlsPer128 = ImagParam.numChannel/(UserSet.samplePerWave*2); % wavelengths in 128 samples for PI
+            Intermediate.numRcvSamples = 2*(Intermediate.wlsPer128*ceil(Intermediate.maxAcqLength/Intermediate.wlsPer128))*UserSet.samplePerWave;
+        case 'M'  
+            Intermediate.sampleDepthWL=ceil(UserSet.sampleDepthMM*1e-3*(Trans.frequency/1540));
+            Intermediate.maxAcqLength = sqrt(Intermediate.sampleDepthWL^2 + (2*max(Trans.position(:))*(Trans.frequency/ImagParam.c))^2);
+            Intermediate.wlsPer128 = 256/(UserSet.samplePerWave*2); % wavelengths in 128 samples for PI
             Intermediate.numRcvSamples = 2*(Intermediate.wlsPer128*ceil(Intermediate.maxAcqLength/Intermediate.wlsPer128))*UserSet.samplePerWave;
     end
     UserSet.numSample= Intermediate.numRcvSamples;

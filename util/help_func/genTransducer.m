@@ -151,4 +151,27 @@ switch code
         Trans.lensCorrection=0;
         Trans.bw = Trans.frequency * [1-0.67/2 1+0.67/2];
         Trans.connector = (1:Trans.numElement)';
+        
+    case 'Matrix1024-8'
+        Trans.name = 'Matrix1024-8';
+        Trans.frequency = 7.81e6;
+		Trans.numElement = 1024;
+		Trans.pitch = 0.300e-3;
+		Trans.width = 0.275e-3;
+        
+        tempX = linspace(-4.65,4.65,32);
+        tempY = linspace(5.1,-5.1,35);
+        tempY = tempY([1:8,10:17,19:26,28:35]);
+        [ElePosX,ElePosY] =ndgrid(tempX,tempY);
+        Trans.position = [ElePosX(:),ElePosY(:),zeros(Trans.numElement,1)];
+        
+		connectorES=[128:-1:65,1:64,192:-1:129,193:256,...
+                             384:-1:321,257:320,448:-1:385,449:512,...
+                             640:-1:577,513:576,704:-1:641,705:768,...
+                             896:-1:833,769:832,960:-1:897,961:1024];
+            
+        Trans.position(connectorES,:)=Trans.position*1e-3;
+        Trans.bw = [4 12]*1e6;
+        Trans.lensCorrection=0;  %in m units
+        Trans.connector = (1:Trans.numElement)';
 end

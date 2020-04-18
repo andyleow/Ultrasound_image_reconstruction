@@ -137,6 +137,21 @@ if RcvLastFrame<sizeRcvData(3)
    RcvData=circshift(RcvData,[0,0,sizeRcvData(3)-RcvLastFrame]);
 end
 
+% Reshaping RcvData
+if pixelMap.type =='M'
+%     RF_data=RcvData{1}; %[n*4*acq, ch, fr]
+%     clear RcvData
+       
+    RcvData=permute(RcvData,[2,1,3]);  % [ch, n*4*acq, fr]
+    RcvData=reshape(RcvData,[],ImagParam.numSample,4,ImagParam.numAcq,ImagParam.numFrame); %[ch,n,4,acq,fr]
+    RcvData=permute(RcvData,[1,3,2,4,5]); %[ch,4,n,acq,fr]
+    RcvData=reshape(RcvData,ImagParam.numChannel,ImagParam.numSample*ImagParam.numAcq,ImagParam.numFrame); %[4*ch,n*acq,fr]
+    RcvData=permute(RcvData,[2,1,3]);
+    
+%     RcvData{1}=RF_data;
+%     clear RF_data;
+end
+
 %%  Restructure receive data
 
 totalFrame = ceil((ImagParam.endFrame-ImagParam.startFrame+1)/ImagParam.skipFrame);
@@ -210,20 +225,22 @@ else
     end
 end
 %% Define Aperture Index and position
-numChannel=sizeRcvData(2);
-Channels=1:numChannel;
+% numChannel=sizeRcvData(2);
+% Channels=1:numChannel;
+Channels=1:ImagParam.numChannel;
 
-if numChannel<Trans.numElement
+if ImagParam.numChannel<Trans.numElement
     actApertureX=Trans.position(Channels+Trans.startAperture-1,1);
+    actApertureY=Trans.position(Channels+Trans.startAperture-1,2);
+    actApertureZ=Trans.position(Channels+Trans.startAperture-1,3);
     Trans.connector = Trans.connector(Channels+Trans.startAperture-1);
 %     Channels=circshift(Channels,[0,-Trans.startAperture+1]);
 else
      actApertureX=Trans.position(:,1);
+     actApertureY=Trans.position(:,2);
+     actApertureZ=Trans.position(:,3);
      numChannel=Trans.numElement;    
 end
-
-actApertureY=Trans.position(:,2);
-actApertureZ=Trans.position(:,3);
 
 %%
 % Generate pixel map of the imaging view
@@ -233,24 +250,37 @@ if isempty(pixelMapY)
     pixelMapY=0;
 end
 pixelMapZ = (pixelMap.upperLeft(3):pixelMap.dz:pixelMap.bottomRight(3))';
-imageSize = [length(pixelMapZ),length(pixelMapX)] ;			% 5mm = 33pixel pixel.z
 
- if ~isfield(pixelMap,'focus')
-     pixelMap.focus=0;
- end
+if pixelMapY==0
+    imageSize = [length(pixelMapZ),length(pixelMapX)] ;			% 5mm = 33pixel pixel.z
+else
+    imageSize = [length(pixelMapZ),length(pixelMapX),length(pixelMapY)] ;			% 5mm = 33pixel pixel.z
+end
+
+if ~isfield(pixelMap,'focus')
+    pixelMap.focus=0;
+end
  
  %%
 % Initialise output image
 switch (ImagParam.returnType)
     case 'LRI'
         ReconMode=1;
-        ImgData = zeros(imageSize(1),imageSize(2),ImagParam.numFiringPerFrame,floor(totalFrame/ImagParam.skipFrame),'single');
+        if pixelMapY==0
+            ImgData = zeros(imageSize(1),imageSize(2),ImagParam.numFiringPerFrame,floor(totalFrame/ImagParam.skipFrame),'single');
+        else
+            ImgData = zeros(imageSize(1),imageSize(2),imageSize(3),ImagParam.numFiringPerFrame,floor(totalFrame/ImagParam.skipFrame),'single');
+        end
     case 'CRI'
         ReconMode=2;
         ImgData = zeros(imageSize(1),imageSize(2),ImagParam.numChannel,ImagParam.numFiringPerFrame,floor(totalFrame/ImagParam.skipFrame),'single');
     otherwise
         ReconMode=0;
-        ImgData = zeros(imageSize(1),imageSize(2),floor(totalFrame/ImagParam.skipFrame),'single');
+        if pixelMapY ==0
+            ImgData = zeros(imageSize(1),imageSize(2),floor(totalFrame/ImagParam.skipFrame),'single');
+        else
+           ImgData = zeros(imageSize(1),imageSize(2),imageSize(3),ImagParam.numFiringPerFrame,floor(totalFrame/ImagParam.skipFrame),'single');
+        end
 end
 
 % Turn on progress bar
@@ -259,9 +289,9 @@ if (strcmp(progress,'on'))
 end
 
 if isinteger(RcvData)
-    rf_data=zeros(ImagParam.numSample,numChannel,ImagParam.numFiringPerFrame,'int16');
+    rf_data=zeros(ImagParam.numSample,ImagParam.numChannel,ImagParam.numFiringPerFrame,'int16');
 else
-    rf_data=zeros(ImagParam.numSample,numChannel,ImagParam.numFiringPerFrame,'single');
+    rf_data=zeros(ImagParam.numSample,ImagParam.numChannel,ImagParam.numFiringPerFrame,'single');
 end
 for i = 1:totalFrame
     RcvIndex=(i-1)*ImagParam.skipFrame+ImagParam.startFrame;
@@ -296,11 +326,19 @@ for i = 1:totalFrame
     
     switch (ImagParam.returnType)
         case 'LRI'
-            ImgData(:,:,:,i) = image1;
+            if  pixelMapY ==0
+                ImgData(:,:,:,i) = image1;
+            else
+                ImgData(:,:,:,:,i) = image1;
+            end
         case 'CRI'
             ImgData(:,:,:,:,i) = image1;
         otherwise
-            ImgData(:,:,i) = image1;
+            if pixelMapY == 0
+                ImgData(:,:,i) = image1;
+            else
+                ImgData(:,:,:,i) = image1;
+            end
     end
 end
 if isinteger(rf_data)
