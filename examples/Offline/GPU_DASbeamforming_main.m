@@ -11,7 +11,7 @@ direc='./dataset/'
 savedir=[direc,'result/'];mkdir(savedir);
 file = dir([direc, '*.mat']);
 
-for fileIndex=1%:length(file)
+for fileIndex=8%:length(file)
     %     close all
     location=[direc file(fileIndex).name];
     load(location,'UserSet','Trans');
@@ -27,12 +27,12 @@ for fileIndex=1%:length(file)
     %         Trans.name = 'L12-3v';
     %% Define recon parameter
     Recon.startFtrame = 1;
-    Recon.endFrame =2;% UserSet.numAcq*UserSet.NumFrame;
+    Recon.endFrame =1;% UserSet.numAcq*UserSet.NumFrame;
     %     Recon.NumFiringPerFrame = UserSet.na;
     %     Recon.skipFrame = 1; % 1 = no skip, 2 = skip 1 frame, etc
     %     Recon.sumPulse=0;       %Pulse summing 0:Bmode, 1:PI all-no summing 2: PI sum-sum2pulse
 %     Trans.name=UserSet.tranducer;
-    Recon.type  = 'LRI';		% HRI, LRI, or CRI
+    Recon.type  = 'HRI';		% HRI, LRI, or CRI
     [UserSet,Trans,ImagParam] = genParams(UserSet,Trans,Recon);
     if strcmp(Trans.name,'LPICMUS') 
        ImagParam.delay = -abs(Trans.position(1)*sin(ImagParam.degX_tx))/ImagParam.c;
@@ -74,7 +74,19 @@ for fileIndex=1%:length(file)
             pixelMap.dx=Trans.pitch;
             pixelMap.upperLeft = [-UserSet.sampleDepthMM, 0, 0*1e3]/1000;
             pixelMap.bottomRight = [UserSet.sampleDepthMM, 0, UserSet.sampleDepthMM]/1000;
+        case 'M'
+            pixelMap.focus=UserSet.focusMM*1e-3;
+            pixelMap.dz=50e-6;%1540/(Trans.frequency);
+            pixelMap.dx=Trans.pitch/2;
+            pixelMap.dy=Trans.pitch/2;
+            pixelMap.upperLeft = [min(Trans.position(:,1))*1e3-UserSet.sampleDepthMM * tand(UserSet.viewAngle),...
+                min(Trans.position(:,2))*1e3-UserSet.sampleDepthMM * tand(UserSet.viewAngle),...
+                0*1e3]/1000;
+            pixelMap.bottomRight = [max(Trans.position(:,1))*1e3+UserSet.sampleDepthMM * tand(UserSet.viewAngle),...
+                max(Trans.position(:,2))*1e3+UserSet.sampleDepthMM * tand(UserSet.viewAngle),...
+                UserSet.sampleDepthMM]/1000;
     end
+    
     %% GPU Beamforming
     tic;
     data = DAS_GPU_beamforming(location, Trans,ImagParam, FiltParam,pixelMap,'on');
@@ -82,32 +94,78 @@ for fileIndex=1%:length(file)
     %     return
     %% Display and save Images
     open(vid1);
+    
     figure
     z=(0:size(data,1)-1)*pixelMap.dz*1e3+pixelMap.upperLeft(2)*1e3;
     %     x=((0:size(data,2))*pixSize+pixelMap.UpperLeft(1))*1e3;
     x=((0:size(data,2)-1)*pixelMap.dx+pixelMap.upperLeft(1))*1e3;
     
     if strcmp(ImagParam.returnType,'LRI')
-        data1=squeeze(sum(data,3));
+        if pixelMap.type=='M'
+            data1=squeeze(sum(data,4));
+        else
+            data1=squeeze(sum(data,3));
+        end
     else
         data1=data;
     end
     normMax=mean(max(max(abs(data1(:)))));
     
-    for i=1:size(data1,3)
-        imagesc(x,z,20*log10(abs(data1(:,:,i))/normMax),[-60,0]);
-        %         imagesc(x,z,20*log10(abs(sum(data(:,:,:,i),3)/normMax)),[-30,0]);
-        title(['Frame=',num2str(i)]);
-        xlabel('mm');
-        ylabel('mm');
-        axis image;
-        %         xlim([-50 50]);
-        colormap(gray);
-        set(gca,'FontSize',14);
-        %         pause();
-        F(i)=getframe(gcf);
-        drawnow
-        writeVideo(vid1,F(i));
+    if pixelMap.type=='M'
+        if ndims(data1)>3  %Display centre slices for display i
+            for i=1:size(data1,4)
+                subplot(1,2,1)
+                imagesc(x,z,20*log10(abs(squeeze(data1(:,:,round(size(data1,3)/2),i)))/normMax),[-60,0]);
+                title(['SliceX, Frame=',num2str(i)]);
+                xlabel('mm');
+                ylabel('mm');
+                axis image;
+                colormap(gray);
+                set(gca,'FontSize',14);
+                subplot(1,2,2)
+                imagesc(x,z,20*log10(abs(squeeze(data1(:,round(size(data1,2)/2),:,i)))/normMax),[-60,0]);
+                title(['Slice Y, Frame=',num2str(i)]);
+                xlabel('mm');
+                ylabel('mm');
+                axis image;
+                colormap(gray);
+                set(gca,'FontSize',14);
+                pause(0.01)
+                F(i)=getframe(gcf);
+                drawnow
+                writeVideo(vid1,F(i));
+            end
+        else
+            for i=1:size(data1,3)
+                imagesc(x,z,20*log10(abs(data1(:,:,i))/normMax),[-60,0]);
+                title(['Slice = ',num2str(i)]);
+                xlabel('mm');
+                ylabel('mm');
+%                 axis image;
+                colormap(gray);
+                set(gca,'FontSize',14);
+                pause(0.01)
+                F(i)=getframe(gcf);
+                drawnow
+                writeVideo(vid1,F(i));
+            end
+        end
+    else
+        for i=1:size(data1,3)
+            imagesc(x,z,20*log10(abs(data1(:,:,i))/normMax),[-60,0]);
+            %         imagesc(x,z,20*log10(abs(sum(data(:,:,:,i),3)/normMax)),[-30,0]);
+            title(['Frame=',num2str(i)]);
+            xlabel('mm');
+            ylabel('mm');
+            axis image;
+            %         xlim([-50 50]);
+            colormap(gray);
+            set(gca,'FontSize',14);
+            %         pause();
+            F(i)=getframe(gcf);
+            drawnow
+            writeVideo(vid1,F(i));
+        end
     end
     %
     close(vid1);
