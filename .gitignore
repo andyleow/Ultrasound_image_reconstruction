@@ -1,6 +1,4 @@
 #Igonoring path 
 /dataset
 *.zip
-**/*.cu
-**/*.cuh
 /examples/Offline/misc/*
